@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.optim as optim
 from sklearn.model_selection import StratifiedKFold
 import numpy as np
-from captum.attr import KernelShap
 from sklearn.metrics import accuracy_score
 
 
@@ -86,16 +85,11 @@ def cross_val_train(model, X, y, n_splits=5, epochs=1000, lr=0.001):
 # input_size = X.shape[1]  # Assuming you have X and y loaded with proper shapes
 
 # #model = cross_validate(X, y, input_size, n_splits=5, epochs=10000, lr=0.001)
-# #torch.save(model.state_dict(), 'model.pth')
+# #torch.save(model.state_dict(), 'model.pth'# print(model.forward(torch.tensor([1,1,0,0,0,0,0,0,0,0,0,0], dtype=torch.float32)))
 
-# model = FeedForwardNN(input_size)
-# model.load_state_dict(torch.load("model.pth"))
-
-# print(model.forward(torch.tensor([1,1,0,0,0,0,0,0,0,0,0,0], dtype=torch.float32)))
-
-# exp = KernelShap(model.forward)
+# 
 
 # first_lines = X[3:4]
 # print(first_lines)
 
-# print(exp.attribute(torch.tensor(first_lines, dtype=torch.float32, requires_grad=True)))
+# print()
