@@ -1,17 +1,10 @@
 import numpy as np
 import torch
+import random
 
-truth_table_and = {
-    (-1, -1): -1,
-    (-1, 1): -1,    
-    (-1, 0): -1,    
-    (1, -1): -1,    
-    (1, 1): 1,      
-    (1, 0): 0,      
-    (0, -1): -1,    
-    (0, 1): 0,      
-    (0, 0): 0       
-}
+from bool3 import B
+
+
 
 def concat(base, add):
     retval = []
@@ -27,36 +20,58 @@ def pow(base, n):
         accumulator = concat(accumulator, base)
     return accumulator
 
-def and_2(perms):
-    for row in perms:
-        row.append(truth_table_and[(row[0], row[1])])
+def gen_and(row):
+    return B(row[0]) & B(row[1])
 
-    arr = np.array(perms)
-    np.random.shuffle(arr)
+def gen_or(row):
+    return B(row[0]) | B(row[1])
 
-    X = arr[:, :12]      
-    y = arr[:, 12] 
+def gen_xor(row):
+    return B(row[0]) ^ B(row[1])
 
-    exps = []
-    for i in range(X.shape[0]):  
-        a, b = X[i][0], X[i][1]
-        if a == b:
-            exps.append([0, 1])
-        elif a == 1:
-            exps.append([1])
-        elif b == 1:
-            exps.append([0])
-        elif a == -1:
-            exps.append([0])
-        elif b == -1:
-            exps.append([1])
+def gen_xor_and_xor(row):
+    return ((B(row[0]) ^ B(row[1])) & (B(row[2]) ^ B(row[3]))).value
 
-    return X, y, exps
+def gen_n_xor_and(n):
+    n -= 1
+    def gen_xor_and(row):
+        if n < 3:
+            return B(row[0]) ^ B(row[1])
+        elif n % 2 == 1:
+            return lambda row: gen_n_xor_and(row) & B(row[n])
+        else:
+            return lambda row: gen_xor_and(row) ^ B(row[n])
+    
+    return gen_xor_and
 
+
+gen_funcs = {
+    # gen_and,
+    # gen_or,
+    # gen_xor,
+    # gen_xor_and_xor,
+    "xor_and_3": gen_n_xor_and(3),
+    "xor_and_4": gen_n_xor_and(4),
+    "xor_and_5": gen_n_xor_and(5)
+}
+
+
+def apply(func, base):
+    result = []
+    for row in base:
+        result.append([*row, func(row).value])
+
+    return result
 
 def generate():
-    result = pow([[-1], [0], [1]], 12)
-    X, y, exp = and_2(result)
-    print(X[0], y[0], exp[0])
+    base = pow([[2], [1], [0]], 12)
+    for name, func in gen_funcs.items():
+        result = apply(func, base)
+        
+        random.shuffle(result)
+        yield torch.tensor([arr[:12] for arr in result], dtype=torch.float32), \
+                torch.tensor([arr[12] for arr in result], dtype=torch.float32), \
+                    name
 
-    return and_2(result)
+if __name__ == "__main__":
+    generate()

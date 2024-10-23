@@ -15,7 +15,7 @@ class FeedForwardNN(nn.Module):
         self.fc3 = nn.Linear(20, 20)
         self.fc4 = nn.Linear(20, 20)
         self.fc5 = nn.Linear(20, 20)
-        self.fc6 = nn.Linear(20, 1)
+        self.fc6 = nn.Linear(20, 3)
         
         self.relu1 = nn.ReLU()
         self.relu2 = nn.ReLU()
@@ -34,11 +34,11 @@ class FeedForwardNN(nn.Module):
 
 
 def train_model(model, X_train, y_train, X_val, y_val, epochs=1000, lr=0.001):
-    criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
     
     inputs = torch.tensor(X_train, dtype=torch.float32)
-    targets = torch.tensor(y_train, dtype=torch.float32).unsqueeze(1)
+    targets = torch.tensor(y_train, dtype=torch.long)
     val_inputs = torch.tensor(X_val, dtype=torch.float32)    
     for epoch in range(epochs):
         model.train()
@@ -53,8 +53,7 @@ def train_model(model, X_train, y_train, X_val, y_val, epochs=1000, lr=0.001):
         model.eval()
         with torch.no_grad(): 
             val_outputs = model(val_inputs)
-
-            val_preds = torch.where(val_outputs > 0, 1, 0)
+            val_preds = torch.argmax(val_outputs, dim=1)
 
             val_preds = val_preds.numpy()
             val_acc = accuracy_score(y_val, val_preds)

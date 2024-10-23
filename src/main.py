@@ -11,7 +11,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 from models import cross_val_train, FeedForwardNN
-from explainers import kernel_shap, saliency, shapely_values, deeplift, lrp, deeplift, input_x_grad, integrated_grad, deeplift_shap
+from explainers import kernel_shap, saliency, shapely_values, deeplift, lrp, deeplift, input_x_grad, integrated_grad
 import permutations
 
 explainers = {
@@ -53,6 +53,43 @@ def cluster_baselines(data):
     return centroids
 
 
+def bool_train():
+    for X, y, name in permutations.generate():
+        nn = FeedForwardNN(12)
+        nn = cross_val_train(nn, X, y, 5, 200)
+        torch.save(nn.state_dict(), f"models_3val/{name}.pth")    
+
+
+def bool_test():
+    X, y, _ = next(permutations.generate())
+
+    print(X[0], y[0])
+    nn = FeedForwardNN(12)
+    # nn = cross_val_train(nn, X, y, 5, 200)
+    nn.load_state_dict(torch.load("models_3val/AND.pth"))
+    # torch.save(nn.state_dict(), f"models_3val/AND.pth")
+    
+    results = {}
+    for name in explainers.keys(): results[name] = 0
+    
+    X, y, exp = dataloader.load("data/AND.csv")
+    for i in range(2**12):
+        print("\n\n\n\n")
+        for name, f_exp in explainers.items():
+            ex = cluster_explanation(
+                f_exp(nn, 
+                      torch.tensor(X[i: i + 1], dtype=torch.float32, requires_grad=True),
+                      int(y[i])
+                )
+            )
+            if ex == exp[i]:
+                results[name] += 1
+
+        [print(exp, (n/(i + 1))) for exp, n in results.items()]   
+
+
+
+
 def full_test():
     test_set_paths = list(filter(lambda x: x.endswith(".csv"), get_relative_filepaths("./data")))
     full_result = {"Headers": [dataset for dataset in test_set_paths]}
@@ -89,4 +126,5 @@ def full_test():
 if __name__ == "__main__":
     # main()
     # train_synth()
-    full_test()
+    # full_test()
+    bool_train()

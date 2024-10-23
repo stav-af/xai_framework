@@ -16,8 +16,8 @@ def load(DATASET_LOCATION):
     """
     with open(DATASET_LOCATION) as f:
         data = [x.strip().split(",") for x in f.readlines()][1:]
-        X_raw = [[1 if val == '1' else -1 for val in row[:12]] for row in data]
-        y_raw = [1 if row[12] == '1' else 0 for row in data]
+        X_raw = [[2 if val == '1' else 0 for val in row[:12]] for row in data]
+        y_raw = [2 if row[12] == '1' else 0 for row in data]
         explanation_raw = [row[13:] for row in data]
     
     X = np.array(X_raw)
