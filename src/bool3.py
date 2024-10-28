@@ -1,7 +1,7 @@
 class B:
     # Define the three possible values
     TRUE = 2
-    FALSE = 0
+    FALSE = 0 
     UNASSIGNED = 1
 
     def __init__(self, value=None):

@@ -3,7 +3,7 @@ import torch
 import random
 
 from bool3 import B
-
+from functools import partial
 
 
 def concat(base, add):
@@ -30,29 +30,52 @@ def gen_xor(row):
     return B(row[0]) ^ B(row[1])
 
 def gen_xor_and_xor(row):
-    return ((B(row[0]) ^ B(row[1])) & (B(row[2]) ^ B(row[3]))).value
+    return ((B(row[0]) ^ B(row[1])) & (B(row[2]) ^ B(row[3])))
 
-def gen_n_xor_and(n):
-    n -= 1
-    def gen_xor_and(row):
-        if n < 3:
-            return B(row[0]) ^ B(row[1])
-        elif n % 2 == 1:
-            return lambda row: gen_n_xor_and(row) & B(row[n])
+def gen_n_xor_and(n, row):
+    result = B(row[0]) ^ B(row[1])
+    for i in range(2, n):
+        operand = B(row[i])
+        if i % 2 == 0:
+            result &= operand
         else:
-            return lambda row: gen_xor_and(row) ^ B(row[n])
-    
-    return gen_xor_and
+            result ^= operand
+
+    return result
+
+def gen_n_and_or(n, row):
+    result = B(row[0]) & B(row[1])
+    for i in range(2, n):
+        operand = B(row[i])
+        if i % 2 == 0:
+            result |= operand
+        else:
+            result &= operand
+
+    return result
 
 
 gen_funcs = {
-    # gen_and,
-    # gen_or,
-    # gen_xor,
-    # gen_xor_and_xor,
-    "xor_and_3": gen_n_xor_and(3),
-    "xor_and_4": gen_n_xor_and(4),
-    "xor_and_5": gen_n_xor_and(5)
+    "and": gen_and,
+    "or": gen_or,
+    "xor": gen_xor,
+    "xor_and_xor": gen_xor_and_xor,
+    "xor_and_3": partial(gen_n_xor_and, 3),
+    "xor_and_4": partial(gen_n_xor_and, 4),
+    "xor_and_5": partial(gen_n_xor_and, 5),
+    "xor_and_6": partial(gen_n_xor_and, 6),
+    "xor_and_7": partial(gen_n_xor_and, 7),
+    "xor_and_8": partial(gen_n_xor_and, 8),
+    "xor_and_9": partial(gen_n_xor_and, 9),
+    "xor_and_10": partial(gen_n_xor_and, 10),
+    "and_or_3": partial(gen_n_and_or, 3),
+    "and_or_4": partial(gen_n_and_or, 4),
+    "and_or_5": partial(gen_n_and_or, 5),
+    "and_or_6": partial(gen_n_and_or, 6),
+    "and_or_7": partial(gen_n_and_or, 7),
+    "and_or_8": partial(gen_n_and_or, 8),
+    "and_or_9": partial(gen_n_and_or, 9),
+    "and_or_10": partial(gen_n_and_or, 10),
 }
 
 
@@ -74,4 +97,9 @@ def generate():
                     name
 
 if __name__ == "__main__":
-    generate()
+    base = pow([[2], [1], [0]], 12)
+    gen_n_xor_and(3, base[0])    
+
+
+
+

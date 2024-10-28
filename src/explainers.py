@@ -5,7 +5,7 @@ import numpy as np
 
 baseline = torch.tensor([1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,])
 
-deeplift_baseline = torch.tensor([[1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.]])
+deeplift_baseline = torch.tensor([[1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,]])
 
 
 def shapely_values(model, data, target):
@@ -13,7 +13,8 @@ def shapely_values(model, data, target):
     res = explainer.attribute(
         data,
         baselines=deeplift_baseline,
-        target=torch.tensor([target])
+        target=torch.tensor([target]),
+        n_samples = 25
     )
     return res
 
@@ -22,7 +23,8 @@ def kernel_shap(model, data, target):
     explanation = explainer.attribute(
         data, 
         baselines=baseline,
-        target=target
+        target=target,
+        n_samples = 100
     )
 
     return explanation

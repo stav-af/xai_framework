@@ -13,17 +13,56 @@ warnings.filterwarnings("ignore")
 from models import cross_val_train, FeedForwardNN
 from explainers import kernel_shap, saliency, shapely_values, deeplift, lrp, deeplift, input_x_grad, integrated_grad
 import permutations
+import types
+
+model_testset = {
+    "and.pth": "AND.csv",
+    "or.pth": "OR.csv",
+    "xor.pth": "XOR.csv",
+    "xor_and_xor.pth": "XOR_AND_XOR.csv",
+    "xor_and_3.pth": "XOR_AND/XOR_AND_3.csv",
+    "xor_and_4.pth": "XOR_AND/XOR_AND_4.csv",
+    "xor_and_5.pth": "XOR_AND/XOR_AND_5.csv",
+    "xor_and_6.pth": "XOR_AND/XOR_AND_6.csv",
+    "xor_and_7.pth": "XOR_AND/XOR_AND_7.csv",
+    "xor_and_8.pth": "XOR_AND/XOR_AND_8.csv",
+    "xor_and_9.pth": "XOR_AND/XOR_AND_9.csv",
+    "xor_and_10.pth": "XOR_AND/XOR_AND_10.csv",
+    "and_or_3.pth": "AND_OR/AND_OR_3.csv",
+    "and_or_4.pth": "AND_OR/AND_OR_4.csv",
+    "and_or_5.pth": "AND_OR/AND_OR_5.csv",
+    "and_or_6.pth": "AND_OR/AND_OR_6.csv",
+    "and_or_7.pth": "AND_OR/AND_OR_7.csv",
+    "and_or_8.pth": "AND_OR/AND_OR_8.csv",
+    "and_or_9.pth": "AND_OR/AND_OR_9.csv",
+    "and_or_10.pth": "AND_OR/AND_OR_10.csv"
+}
 
 explainers = {
     # "DeepLiftShap": deeplift_shap,
+    "ShapleyValues": shapely_values,
     "KernelShap": kernel_shap,
     "Saliency": saliency,
-    "ShapleyValues": shapely_values,
     "DeepLift": deeplift,
     "lrp": lrp,
     "InputXGrad": input_x_grad,
     "IntegratedGrad": integrated_grad
 }
+
+def hack_forward(nn):
+    """
+        Gradient-based explainers implicitly use a 0 baseline. 
+        This hacks the forward function to output classes -1, 0, 1 instead of 0, 1, 2
+        This gives us acceptable performance in the grad based explainers
+    
+        But we can still use standard classification loss functions (CE)
+    """
+    original_forward = nn.forward
+    def new_forward(self, x):
+        return original_forward(x) - 1
+    
+    nn.forward = types.MethodType(new_forward, nn)
+    return nn
 
 
 def get_relative_filepaths(directory):
@@ -33,7 +72,7 @@ def get_relative_filepaths(directory):
 
 def cluster_explanation(vector):
     vector_np = vector.detach().numpy()
-    abs_vector = np.abs(vector_np).reshape(-1, 1)  # Reshape for clustering
+    abs_vector = np.abs(vector_np).reshape(-1, 1)
     
     kmeans = KMeans(n_clusters=2, random_state=0, n_init=10).fit(abs_vector)
     cluster_centers = kmeans.cluster_centers_
@@ -44,6 +83,12 @@ def cluster_explanation(vector):
     relevant_indices = np.where(labels == relevant_cluster)[0]
     return relevant_indices.tolist()
 
+
+def top_n_features(vector, n):
+    _, indices = torch.topk(vector, n)
+    indices_list = indices.tolist()
+
+    return set(indices_list[0])
 
 def cluster_baselines(data):
     kmeans = KMeans(n_clusters=20, random_state=0)
@@ -61,70 +106,40 @@ def bool_train():
 
 
 def bool_test():
-    X, y, _ = next(permutations.generate())
-
-    print(X[0], y[0])
-    nn = FeedForwardNN(12)
-    # nn = cross_val_train(nn, X, y, 5, 200)
-    nn.load_state_dict(torch.load("models_3val/AND.pth"))
-    # torch.save(nn.state_dict(), f"models_3val/AND.pth")
-    
-    results = {}
-    for name in explainers.keys(): results[name] = 0
-    
-    X, y, exp = dataloader.load("data/AND.csv")
-    for i in range(2**12):
-        print("\n\n\n\n")
-        for name, f_exp in explainers.items():
-            ex = cluster_explanation(
-                f_exp(nn, 
-                      torch.tensor(X[i: i + 1], dtype=torch.float32, requires_grad=True),
-                      int(y[i])
-                )
-            )
-            if ex == exp[i]:
-                results[name] += 1
-
-        [print(exp, (n/(i + 1))) for exp, n in results.items()]   
-
-
-
-
-def full_test():
-    test_set_paths = list(filter(lambda x: x.endswith(".csv"), get_relative_filepaths("./data")))
-    full_result = {"Headers": [dataset for dataset in test_set_paths]}
-    for expname in explainers.keys(): full_result[expname] = []
-
-    for path in test_set_paths:
-        X, y, exp = dataloader.load(f"data/{path}")
-        baselines = torch.tensor(cluster_baselines(X), dtype=torch.float32)
-
-        nn = FeedForwardNN(X.shape[1])
-        nn = cross_val_train(nn, X, y, 5, 200)
-
-        torch.save(nn.state_dict(), f"models/{path}".replace(".csv", ".pth"))
-
-        results = {}
-        for name in explainers.keys(): results[name] = 0
+    results = [["models", *[exp_name for exp_name in explainers.keys()]]]
+    for model_name in model_testset.keys(): 
+        results.append([model_name])
         
-        for i in range(1, 4067, 40):
-            print("\n\n\n\n")
-            for name, f_exp in explainers.items():
-                ex = cluster_explanation(f_exp(nn, torch.tensor(X[i - 1: i], dtype=torch.float32, requires_grad=True)))
-                if ex == exp[i - 1]:
-                    results[name] += 1
-
-            [print(exp, (n*40)/i) for exp, n in results.items()]   
-
-        for name, result in results.items():
-            full_result[name].append((result/4096) * 40)
+        X, y, exps_correct = dataloader.load(f"data/{model_testset[model_name]}")
+        nn = FeedForwardNN(12)
+        nn.load_state_dict(torch.load(f"models_3val/{model_name}"))
         
-    print(full_result)
-    with open("initial_dump.pkl", 'w') as file:
-        json.dump(full_result, file, indent=4)
+        # return -1, 1 instead of 0, 2
+        # nn = hack_forward(nn)
+        for exp_name in results[0][1:]:
+
+            accuracy = 0
+            exp_func = explainers[exp_name]
+            for i in range(0, 4096):
+                feature_importance = exp_func(
+                        nn, 
+                        torch.tensor(X[i: i+1], dtype=torch.float32, requires_grad=True),
+                        target=int(y[i]))
+                
+                exp_extracted = top_n_features(feature_importance, len(exps_correct[i]))
+                if exp_extracted == set(exps_correct[i]): accuracy += 1
+                
+                print(exp_name, model_name)
+                print(exp_extracted, exps_correct[i], X[i])
+                if i > 0: print((accuracy) / (i + 1)) 
+            results[-1].append(accuracy / 4096)
+
+    np.savetxt('text.txt', results, fmt='%s')
+
+
         
 if __name__ == "__main__":
     # main()
     # train_synth()
-    # full_test()
-    bool_train()
+    bool_test()
+    # bool_train()
