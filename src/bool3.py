@@ -5,14 +5,10 @@ class B:
     UNASSIGNED = 1
 
     def __init__(self, value=None):
-        if value is None:
-            self.value = B.UNASSIGNED
-        elif value in (True, False):
-            self.value = B.TRUE if value else B.FALSE
-        elif value in (B.TRUE, B.FALSE, B.UNASSIGNED):
-            self.value = value
-        else:
-            raise ValueError(f"Invalid value for B: {value}")
+        if value in (0, 1, 2):
+            if value == 0: self.value = B.FALSE
+            elif value == 1: self.value = B.UNASSIGNED
+            else: self.value = B.TRUE
 
     def __repr__(self):
         if self.value == B.TRUE:

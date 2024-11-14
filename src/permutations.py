@@ -97,6 +97,16 @@ def generate():
                     name
 
 if __name__ == "__main__":
+    base = pow([[2], [1], [0]], 2)
+    # for tx, ty, _ in generate(): print(tx, ty)
+    print(base[0], gen_or(base[0]))    
+    print(base[1], gen_or(base[1]))     
+    print(base[2], gen_or(base[2]))    
+    print(base[3], gen_or(base[3]))    
+    print(base[4], gen_or(base[4]))    
+    print(base[5], gen_or(base[5]))    
+    print(base[6], gen_or(base[6]))    
+    print(base[7], gen_or(base[7]))    
     base = pow([[2], [1], [0]], 12)
     gen_n_xor_and(3, base[0])    
 
