@@ -18,7 +18,7 @@ def shapely_values(model, data, target):
         n_samples = 5
     )
 
-    return res
+    return torch.softmax(res, dim=1)
 
 def kernel_shap(model, data, target):
     explainer = KernelShap(model.forward)
@@ -29,7 +29,7 @@ def kernel_shap(model, data, target):
         n_samples = 5
     )
 
-    return explanation
+    return torch.softmax(explanation, dim=1)
 
 # def deeplift_shap(model, data, target):
 #     explainer = DeepLiftShap(model)
@@ -43,21 +43,24 @@ def saliency(model, data, target):
 def input_x_grad(model, data, target):
     explainer = InputXGradient(model.forward)
     explanation = explainer.attribute(data, target=target)
-    return explanation
+    return torch.softmax(explanation, dim=1)
 
 
 def integrated_grad(model, data, target):
     explainer = IntegratedGradients(model.forward)
-    return explainer.attribute(data, baselines=deeplift_baseline, target=target)
+    explanation = explainer.attribute(data, baselines=deeplift_baseline, target=target)
+    return torch.softmax(explanation, dim=1)
 
 
 def lrp(model, data, target):
     explainer = LRP(model)
-    return explainer.attribute(data, target=target)
+    return torch.softmax (explainer.attribute(data, target=target), dim=1)
 
 def deeplift(model, data, target):
     explainer = DeepLift(model)
-    return explainer.attribute(data, baselines=deeplift_baseline, target=target)
+    explanation = explainer.attribute(data, baselines=deeplift_baseline, target=target)
+    # return torch.softmax(explanation, dim=1)
+    return explanation
 
 
 def rexplain(model, data, target):

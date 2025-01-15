@@ -9,7 +9,7 @@ import random
 import torch
 
 """CONSTANTS"""
-N_PARTITIONS = 3
+N_PARTITIONS = 4
 NEUTRAL_VALUE = 1
 SERACH_DEPTH = 2
 
@@ -107,6 +107,7 @@ def partition(responsibility, choices, n_parts):
     res = aux([], [], 0.0, [])
     return res
 
+
 def apply_responsibility(feature_importance, part, responsibility):
     distributed_resp = responsibility / len(part)
     ret = []
@@ -148,7 +149,7 @@ def rex(nn, feature_values):
     initial_prediction = forward(feature_values)
     feature_importance = [0 for _ in range(len(feature_values))]
     # init partition search queue with feature indices
-    for _ in range(20):
+    for _ in range(25):
         part_q = deque()
         part_q.append((list(range(len(feature_values))), 1.0))
 

@@ -12,6 +12,7 @@ from rex.rex import norm
 from models import cross_val_train, FeedForwardNN
 from explainers import kernel_shap, saliency, shapely_values, deeplift, lrp, deeplift, input_x_grad, integrated_grad, rexplain
 from expression_bank import *
+from responsibility import *
 import permutations
 import types
 import math
@@ -19,25 +20,25 @@ import math
 
 
 model_testset = {
-    # "and.pth": "AND.csv",
-    # "or.pth": "OR.csv",
-    # "xor.pth": "XOR.csv",
-    # "xor_and_xor.pth": "XOR_AND_XOR.csv",
-    # "xor_and_3.pth": "XOR_AND/XOR_AND_3.csv",
-    # "xor_and_4.pth": "XOR_AND/XOR_AND_4.csv",
-    # "xor_and_5.pth": "XOR_AND/XOR_AND_5.csv",
-    # "xor_and_6.pth": "XOR_AND/XOR_AND_6.csv",
-    # "xor_and_7.pth": "XOR_AND/XOR_AND_7.csv",
-    # "xor_and_8.pth": "XOR_AND/XOR_AND_8.csv",
-    # "xor_and_9.pth": "XOR_AND/XOR_AND_9.csv",
-    # "xor_and_10.pth": "XOR_AND/XOR_AND_10.csv",
-    # "and_or_3.pth": "AND_OR/AND_OR_3.csv",
-    # "and_or_4.pth": "AND_OR/AND_OR_4.csv",
-    # "and_or_5.pth": "AND_OR/AND_OR_5.csv",
-    # "and_or_6.pth": "AND_OR/AND_OR_6.csv",
-    # "and_or_7.pth": "AND_OR/AND_OR_7.csv",
-    # "and_or_8.pth": "AND_OR/AND_OR_8.csv",
-    # "and_or_9.pth": "AND_OR/AND_OR_9.csv",
+    "and.pth": "AND.csv",
+    "or.pth": "OR.csv",
+    "xor.pth": "XOR.csv",
+    "xor_and_xor.pth": "XOR_AND_XOR.csv",
+    "xor_and_3.pth": "XOR_AND/XOR_AND_3.csv",
+    "xor_and_4.pth": "XOR_AND/XOR_AND_4.csv",
+    "xor_and_5.pth": "XOR_AND/XOR_AND_5.csv",
+    "xor_and_6.pth": "XOR_AND/XOR_AND_6.csv",
+    "xor_and_7.pth": "XOR_AND/XOR_AND_7.csv",
+    "xor_and_8.pth": "XOR_AND/XOR_AND_8.csv",
+    "xor_and_9.pth": "XOR_AND/XOR_AND_9.csv",
+    "xor_and_10.pth": "XOR_AND/XOR_AND_10.csv",
+    "and_or_3.pth": "AND_OR/AND_OR_3.csv",
+    "and_or_4.pth": "AND_OR/AND_OR_4.csv",
+    "and_or_5.pth": "AND_OR/AND_OR_5.csv",
+    "and_or_6.pth": "AND_OR/AND_OR_6.csv",
+    "and_or_7.pth": "AND_OR/AND_OR_7.csv",
+    "and_or_8.pth": "AND_OR/AND_OR_8.csv",
+    "and_or_9.pth": "AND_OR/AND_OR_9.csv",
     "and_or_10.pth": "AND_OR/AND_OR_10.csv"
 }
 
@@ -143,6 +144,30 @@ def exp_mse(truth, result):
     return se / 12
 
 
+def js_divergence(p, q):
+    p = np.array(p, dtype=float)
+    q = np.array(q, dtype=float)
+    
+    p = np.abs(p)
+    q = np.abs(q)
+
+    p = p / np.sum(p)
+    q = q / np.sum(q)
+    
+    m = 0.5 * (p + q)
+    
+    def kl_divergence(a, b):
+        mask = (a != 0)
+        return np.sum(a[mask] * np.log(a[mask] / b[mask]))
+    
+    js_div = 0.5 * kl_divergence(p, m) + 0.5 * kl_divergence(q, m)
+    
+    if math.isnan(js_div): 
+        print(f"nan on iuts \n{p}\n{q} ")
+        exit(0)
+    return abs(js_div)
+
+
 def bool_test():
     test_size = 500
 
@@ -166,6 +191,8 @@ def bool_test():
         testX = pow([[0], [2]], 12)
         random.shuffle(testX)
         testtree = [insert_values(formula_structures[model_name], x, 0) for x in testX]
+
+        print_expr_tree(testtree)
         testy = [bool_to_int[eval_bool3(t)] for t in testtree]
         exps = [causal_responsibility(t, 1.0) for t in testtree]
         for exp_name in results[0][1:]:
@@ -181,17 +208,16 @@ def bool_test():
                 feature_importance = tfeature_importance.cpu().tolist()
                 ground_truth = exps[i]
                 
-                print("\n\n\n")
+                print(f"\n\n\n {exp_name}, {model_name}:\n")
                 print(testX[i])
-                print(ground_truth)
+                print(norm(ground_truth))
+                print(norm(feature_importance[0]))
 
 
-                loss += math.sqrt(exp_mse(ground_truth, feature_importance[0])) / test_size
-
+                loss += js_divergence((ground_truth), (feature_importance[0])) / test_size
             results[-1].append(loss)
 
     np.savetxt('causal_resp.txt', results, fmt='%s', delimiter=",")
-
 
 def cause_test():
     results = [["models", *[exp_name for exp_name in explainers.keys()]]]
@@ -207,7 +233,7 @@ def cause_test():
         for exp_name in results[0][1:]:
             accuracy = 0
             exp_func = explainers[exp_name]
-            for i in range(0, 500):
+            for i in range(0, 4095):
                 feature_importance = exp_func(
                         nn, 
                         torch.tensor(X[i: i+1], dtype=torch.float32, requires_grad=True),
@@ -219,15 +245,44 @@ def cause_test():
                 if i > 0: print(exp_name, ": ", (accuracy) / (i + 1)) 
             results[-1].append(accuracy / 500)
 
-    np.savetxt('results.txt', results, fmt='%s', delimiter=",")
+    np.savetxt('naive_resp.txt', results, fmt='%s', delimiter=",")
 
 
+def rand_test():
+    X = pow([[0], [2]], 12)
+    random.shuffle(X)
 
 
-        
+    bool_structure = randomize()
+    
+    testtree = [insert_values(bool_structure, x, 0) for x in X]
+    y = [eval_bool3(test) for test in testtree]
+
+    nn = FeedForwardNN(12)
+    cross_val_train(nn, X, y)
+
+    print_expr_tree(testtree)
+    exps = [causal_responsibility(t, 1.0) for t in testtree]
+    
+    results = {}    
+    for exp_name, exp_func in explainers.items():
+        loss = 0
+        trial_count = 4095
+        for i in range(trial_count):
+            exp = exp_func(nn, 
+                    torch.tensor(X[i: i+1], dtype=torch.float32, requires_grad=True),
+                    target=y[i])
+
+            loss = js_divergence(exp, exps[i]) / trial_count
+
+        results[exp_name] = loss
+
+    [print(x, y) for x,y in results.items()]
+
 if __name__ == "__main__":
     # main()
     # train_synth()
     bool_test()
+    cause_test()
     # bool_train()
     # print_expr_tree(n_and_or(10))

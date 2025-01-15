@@ -78,6 +78,7 @@ def print_expr_tree(expr, prefix="", is_left=True):
         return
 
     # If there's an unknown type, just print it directly
+    print("unknown type")
     print(prefix + branch_symbol + str(expr))
 
 def invert(x):
@@ -237,5 +238,3 @@ def randomize():
                 to_consolidate.append(expr)
     
     return to_consolidate.popleft()
-    
-
