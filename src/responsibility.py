@@ -175,26 +175,13 @@ def eval_bool3(expr):
         raise ValueError("Unknown operator")
 
 
-def insert_values(expr, vals):
-    if isinstance(expr, LEAF):
-        expr.val = vals[expr.name]
-        return expr
-
-    elif isinstance(expr, EX):
-        return EX(expr.op, 
-                  insert_values(expr.lhs, vals), 
-                    insert_values(expr.rhs, vals))
-
-    else:
-        return expr
-
 def randomize(complexity):
     # Create a pool of LEAF nodes with unique names
-    leaves = [LEAF(str(i)) for i in range(complexity)]*4
+    leaves = [LEAF(str(i)) for i in range(complexity)] * 2
     random.shuffle(leaves)
     leaf_pool = deque(leaves)
 
-    nulls_left = 12 - complexity
+    nulls_left = 2
     complexity_left = complexity
     while len(leaf_pool) > 1:
         if complexity_left == 0:
@@ -235,6 +222,25 @@ def randomize(complexity):
 
     # Return the root of the randomly constructed formula
     return leaf_pool.popleft()
+
+def insert_values(expr, vals):
+    if isinstance(expr, LEAF):
+        expr.val = vals[expr.name]
+        return expr
+
+    elif isinstance(expr, EX):
+        return EX(expr.op, 
+                  insert_values(expr.lhs, vals), 
+                    insert_values(expr.rhs, vals))
+
+    else:
+        return expr
+
+
+def insert_values_arr(expr, arr):
+    vald = {str(i): arr[i] for i in range(len(arr))}
+    return insert_values(expr, vald)
+
 
 
 if __name__ == "__main__":
