@@ -1,7 +1,8 @@
 from captum.attr import KernelShap, DeepLiftShap, ShapleyValueSampling, Saliency, InputXGradient, IntegratedGradients, LRP, DeepLift
 import torch
 from sklearn.cluster import KMeans
-import numpy as np
+
+from rex.rex import rex
 
 baseline = torch.tensor([1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,1.,])
 
@@ -14,8 +15,9 @@ def shapely_values(model, data, target):
         data,
         baselines=deeplift_baseline,
         target=torch.tensor([target]),
-        n_samples = 25
+        n_samples = 5
     )
+
     return res
 
 def kernel_shap(model, data, target):
@@ -24,7 +26,7 @@ def kernel_shap(model, data, target):
         data, 
         baselines=baseline,
         target=target,
-        n_samples = 100
+        n_samples = 5
     )
 
     return explanation
@@ -54,8 +56,10 @@ def lrp(model, data, target):
     return explainer.attribute(data, target=target)
 
 def deeplift(model, data, target):
-    print(data)
     explainer = DeepLift(model)
     return explainer.attribute(data, baselines=deeplift_baseline, target=target)
 
 
+def rexplain(model, data, target):
+    res = rex(model, data[0])
+    return torch.tensor([res])
