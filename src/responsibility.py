@@ -5,6 +5,8 @@ import random
 
 from permutations import pow
 
+FEATURE_COUNT = 12
+
 def print_expr_tree(expr, prefix="", is_left=True):
     """
     Recursively pretty prints an expression tree in ASCII form.
@@ -121,69 +123,7 @@ def invert(leaf):
     elif leaf == F: return T
     elif leaf == T: return F
 
-class EX:
-    def __init__(self, op, lhs, rhs):
-        self.op = op
-        self.lhs = lhs
-        self.rhs = rhs
-
-class Noise: 
-    def __init__(self, garbage_len):
-        self.garbage_len = garbage_len
-
-def print_expr_tree(expr, prefix="", is_left=True):
-    """
-    Recursively prints an expression tree in ASCII form, including:
-      - EX nodes (showing Bop operator name)
-      - Noise nodes (showing one label 'NOISE' plus 'garbage_len' children)
-      - Atomic/leaf nodes: T, F, U, or LEAF
-    """
-    # Decide which branch symbol to use (├── for left, └── for right)
-    branch_symbol = "├── " if is_left else "└── "
-
-    # Handle atomic/leaf nodes (T, F, U, LEAF)
-    if expr in [T, F, U, LEAF]:
-        print(prefix + branch_symbol + str(expr))
-        return
-
-    # Handle Noise nodes
-    if isinstance(expr, Noise):
-        # Print the parent Noise node
-        print(prefix + branch_symbol + f"NOISE({expr.garbage_len})")
-        # Increase indentation for the Noise node's children
-        child_prefix = prefix + ("│   " if is_left else "    ")
-        # Print 'garbage_len' number of child leaves labeled "NOISE"
-        for i in range(expr.garbage_len):
-            # For intermediate children, use "├──", for last child use "└──"
-            sub_is_left = (i < expr.garbage_len - 1)
-            sub_branch_symbol = "├── " if sub_is_left else "└── "
-            print(child_prefix + sub_branch_symbol + "NOISE")
-        return
-
-    # Handle EX nodes
-    if isinstance(expr, EX):
-        # Print the operator name (e.g. AND, OR, XOR, NULL_RHS, NULL_LHS)
-        print(prefix + branch_symbol + expr.op.name)
-        child_prefix = prefix + ("│   " if is_left else "    ")
-        # Recursively print left subtree
-        print_expr_tree(expr.lhs, prefix=child_prefix, is_left=True)
-        # Recursively print right subtree
-        print_expr_tree(expr.rhs, prefix=child_prefix, is_left=False)
-        return
-
-    # If there's an unknown type, just print it directly
-    print("unknown type")
-    print(prefix + branch_symbol + str(expr))
-
-def invert(x):
-    if isinstance(x, EX):
-        raise ValueError("Cannot invert an expression; check precedence")
-    elif x == T:
-        return F
-    elif x == F:
-        return T
-    else:
-        return x
+    raise ValueError("whatthefuckkingrn")
 
 def eval_bool3(expr):
     if isinstance(expr, LEAF):
@@ -229,61 +169,37 @@ def eval_bool3(expr):
             else:
                 return T
 
-        elif op == Bop.NULL_RHS:
-            return elhs
-        elif op == Bop.NULL_LHS:
-            return erhs
-
         raise ValueError("Unknown operator")
 
 
 def randomize(complexity):
     # Create a pool of LEAF nodes with unique names
-    leaves = [LEAF(str(i)) for i in range(complexity)] * 2
+    leaves = [LEAF(str(i)) for i in range(FEATURE_COUNT)] * 12
     random.shuffle(leaves)
     leaf_pool = deque(leaves)
 
-    nulls_left = 2
     complexity_left = complexity
     while len(leaf_pool) > 1:
-        if complexity_left == 0:
+        if complexity_left <= 0:
             leaf_pool = deque(filter(lambda x: not isinstance(x, LEAF), leaf_pool))
 
-        op_nulls = [Bop.AND, Bop.OR, Bop.XOR, Bop.NULL_LHS, Bop.NULL_RHS, Bop.NOT]
         op_nonull = [Bop.AND, Bop.OR, Bop.XOR, Bop.NOT]
-
         choice = random.choices(
-            op_nulls if nulls_left > 1 else op_nonull
+            op_nonull
         )[0]
 
-        match choice:
-            case Bop.NOT:
-                # Choose a random leaf and wrap it in a NOT operator
-                leaf = leaf_pool.popleft()
-                expr = EX(Bop.NOT, leaf, None)  # NOT only needs one operand (lhs)
-                leaf_pool.append(expr)
-            case Bop.NULL_LHS:
-                unimportant = leaf_pool.popleft()
-                important = leaf_pool.popleft()
-                expr = EX(Bop.NULL_LHS, unimportant, important)
-                leaf_pool.append(expr)
-                nulls_left -= 1
-            case Bop.NULL_RHS:
-                unimportant = leaf_pool.popleft()
-                important = leaf_pool.popleft()
-                expr = EX(Bop.NULL_RHS, important, unimportant)
-                leaf_pool.append(expr)
-                nulls_left -= 1
-            case op:
-                lhs = leaf_pool.popleft()
-                rhs = leaf_pool.popleft()
+        lhs = leaf_pool.popleft()
+        rhs = leaf_pool.popleft()
 
-                expr = EX(op, lhs, rhs)
-                leaf_pool.append(expr)
-                complexity_left -= 2
+        if isinstance(rhs, LEAF): complexity_left -= 1
+        if isinstance(lhs, LEAF): complexity_left -= 1
+
+        expr = EX(choice, lhs, rhs)
+        leaf_pool.append(expr)
 
     # Return the root of the randomly constructed formula
     return leaf_pool.popleft()
+
 
 def insert_values(expr, vals):
     if isinstance(expr, LEAF):

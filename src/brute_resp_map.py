@@ -1,16 +1,16 @@
 
-from collections import deque
 from itertools import combinations
 from dataclasses import dataclass
 from typing import List
+from tqdm import tqdm
 
+import sys
 import random
-import torch
 
 from responsibility import eval_bool3, randomize, insert_values_arr, print_expr_tree
 
 """CONSTANTS"""
-N_PARTITIONS = 3
+N_PARTITIONS = 12
 NEUTRAL_VALUE = 1
 SERACH_DEPTH = 1
 
@@ -150,43 +150,36 @@ def bf_resp(expr, feature_values):
     eval = wrap_eval(expr)
     initial_result = eval(feature_values)
     print(initial_result)
-    feature_importance = [0 for _ in range(len(feature_values))]
     
-    part_q = deque()
-    part_q.append((list(range(len(feature_values))), 1.0))
-    while not len(part_q) == 0:
-        indices, parent_resp = part_q.popleft()
-        partitions = partition(feature_importance, indices, N_PARTITIONS)
+    feature_importance = [0 for _ in range(len(feature_values))]
+    partitions = [[n] for n in range(len(feature_values))]
 
-        mutants = []
-        for combo in partitions_combinations(partitions):
-            occluded_data = occlude(feature_values, combo)
-            mut = Mutant(partitions=combo, data=occluded_data)
-            mutants.append(mut)
+    mutants = []
+    
+    for combo in partitions_combinations(partitions):
+        occluded_data = occlude(feature_values, combo)
+        mut = Mutant(partitions=combo, data=occluded_data)
+        mutants.append(mut)
 
-        cst_set = list(filter(
-            lambda mut: eval(mut.data) == initial_result,
-            mutants
-        ))
+    cst_set = list(filter(
+        lambda mut: eval(mut.data) == initial_result,
+        mutants
+    ))
 
-        for part in partitions:
-            resp = responsibility(part, cst_set)
-            feature_importance = apply_responsibility(feature_importance, part, resp * parent_resp)
-            
-            if resp > 0 and set(part) != set(indices) and len(part) > 1:
-                part_q.append((part, resp))
-
-    eval = wrap_eval(expr)
-    initial_result = eval(feature_values)
+    for part in tqdm(partitions):
+        resp = responsibility(part, cst_set)
+        feature_importance = apply_responsibility(feature_importance, part, resp)
+        
 
     return feature_importance
 
 
 if __name__ == "__main__":
-    rand = randomize(N_PARTITIONS)
+    size = int(sys.argv[1]) if len(sys.argv) > 1 else 5 
+    rand = randomize(size)
 
     print_expr_tree(rand)
     print("\n\n\n")
 
-    result = bf_resp(rand, [2.0 for _ in range(N_PARTITIONS)])
+    result = bf_resp(rand, [2.0 for _ in range(12)])
     print(result)
