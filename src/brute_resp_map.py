@@ -72,43 +72,6 @@ def occlude(data, partitions):
 
     return acc
 
-def partition(responsibility, choices, n_parts):
-    if all(x == 0.0 for x in responsibility):
-        n = len(responsibility)
-        nonzero_resp = [1.0 for _ in range(n)]
-    else:
-        nonzero_resp = responsibility
-
-    raw_options = norm(nonzero_resp)
-    avg_resp = len(choices) / (float(n_parts) * len(responsibility))
-    def aux(acc, curr, score, used):
-        resp_options = [x if (i in choices and i not in used) else 0.0 
-                        for i, x in enumerate(raw_options)]
-
-        norm_resp_options = norm(resp_options)
-        steps = cdf(norm_resp_options)
-
-        if (set(used) == set(choices)) or all(x == 0 for x in resp_options):
-            return acc
-
-        rand = random.random()
-        curr_choice = find_index(lambda x: x > rand, steps)
-        if curr_choice is None:
-            raise RuntimeError("Shouldn't really be here")
-
-        curr_resp = resp_options[curr_choice]
-        next_partition = curr + [curr_choice]
-        next_score = score + curr_resp
-
-        if next_score >= avg_resp:
-            return aux(acc + [next_partition], [], 0.0, used + [curr_choice])
-        else:
-            return aux(acc, next_partition, next_score, used + [curr_choice])
-
-    res = aux([], [], 0.0, [])
-    return res
-
-
 def apply_responsibility(feature_importance, part, responsibility):
     distributed_resp = responsibility / len(part)
     ret = []

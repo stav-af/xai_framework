@@ -174,27 +174,30 @@ def eval_bool3(expr):
 
 def randomize(complexity):
     # Create a pool of LEAF nodes with unique names
-    leaves = [LEAF(str(i)) for i in range(FEATURE_COUNT)] * 12
+    leaves = [LEAF(str(i)) for i in range(FEATURE_COUNT)] * 3
     random.shuffle(leaves)
     leaf_pool = deque(leaves)
 
     complexity_left = complexity
     while len(leaf_pool) > 1:
-        if complexity_left <= 0:
+        if complexity_left < 1:
             leaf_pool = deque(filter(lambda x: not isinstance(x, LEAF), leaf_pool))
 
-        op_nonull = [Bop.AND, Bop.OR, Bop.XOR, Bop.NOT]
-        choice = random.choices(
-            op_nonull
-        )[0]
+        ops = [Bop.AND, Bop.OR, Bop.XOR, Bop.NOT]
+        choice = random.choices(ops)[0]
 
         lhs = leaf_pool.popleft()
-        rhs = leaf_pool.popleft()
+        if(choice == Bop.NOT):
+            expr = EX(choice, lhs, None)
+            if isinstance(lhs, LEAF): complexity_left -= 1
+        else:
+            rhs = leaf_pool.popleft()
+            
+            if isinstance(lhs, LEAF): complexity_left -= 1
+            if isinstance(rhs, LEAF): complexity_left -= 1
+            
+            expr = EX(choice, lhs, rhs)
 
-        if isinstance(rhs, LEAF): complexity_left -= 1
-        if isinstance(lhs, LEAF): complexity_left -= 1
-
-        expr = EX(choice, lhs, rhs)
         leaf_pool.append(expr)
 
     # Return the root of the randomly constructed formula
