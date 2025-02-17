@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import csv
+import itertools
 import torch
 import numpy as np
 import dataloader
@@ -11,8 +13,8 @@ warnings.filterwarnings("ignore")
 from rex.rex import norm
 from models import cross_val_train, FeedForwardNN
 from explainers import kernel_shap, saliency, shapely_values, deeplift, lrp, deeplift, input_x_grad, integrated_grad, rexplain
-from expression_bank import *
 from responsibility import *
+from expression_bank import *
 import permutations
 import types
 import math
@@ -45,8 +47,8 @@ model_testset = {
 formula_structures = {
     "and.pth": and_exp, 
     "or.pth": or_exp,
-    "xor.pth": xor_exp,
-    "xor_and_xor.pth": xor_and,
+    "xor.pth": xor_exp(),
+    "xor_and_xor.pth": xor_and(),
     "xor_and_3.pth": n_xor_and(3),
     "xor_and_4.pth": n_xor_and(4),
     "xor_and_5.pth": n_xor_and(5),
@@ -177,7 +179,7 @@ def bool_test():
 
         X = pow([[0], [1], [2]], 12) 
         random.shuffle(X)
-        trees = [insert_values(formula_structures[model_name], x, 0) for x in X]
+        trees = [insert_values_arr(formula_structures[model_name], x) for x in X]
         y = [bool_to_int[eval_bool3(t)] for t in trees]
 
 
@@ -186,11 +188,11 @@ def bool_test():
 
         nn = FeedForwardNN(12)
         nn.load_state_dict(torch.load(f"models_3val/{model_name}"))
-        # cross_val_train(nn, torchX, torchy, 5, 200)
+        cross_val_train(nn, torchX, torchy, 5, 300)
 
         testX = pow([[0], [2]], 12)
         random.shuffle(testX)
-        testtree = [insert_values(formula_structures[model_name], x, 0) for x in testX]
+        testtree = [insert_values_arr(formula_structures[model_name], x) for x in testX]
 
         print_expr_tree(testtree)
         testy = [bool_to_int[eval_bool3(t)] for t in testtree]
@@ -249,40 +251,103 @@ def cause_test():
 
 
 def rand_test():
-    X = pow([[0], [2]], 12)
-    random.shuffle(X)
-
-
-    bool_structure = randomize()
+    output_filename = "rand_test_results.csv"
     
-    testtree = [insert_values(bool_structure, x, 0) for x in X]
-    y = [eval_bool3(test) for test in testtree]
-
-    nn = FeedForwardNN(12)
-    cross_val_train(nn, X, y)
-
-    print_expr_tree(testtree)
-    exps = [causal_responsibility(t, 1.0) for t in testtree]
+    header = ["num_vars", "instance", *list(explainers.keys())]
+    with open(output_filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
     
-    results = {}    
-    for exp_name, exp_func in explainers.items():
-        loss = 0
-        trial_count = 4095
-        for i in range(trial_count):
-            exp = exp_func(nn, 
-                    torch.tensor(X[i: i+1], dtype=torch.float32, requires_grad=True),
-                    target=y[i])
+    for num_vars in range(3, 10):
+        print(f"Processing formulas with {num_vars} variables...")
+        instance_losses = {exp_name: [] for exp_name in explainers.keys()}
+        instance_counter = 0
 
-            loss = js_divergence(exp, exps[i]) / trial_count
+        valid_instances = []
+        while len(valid_instances) < 10:
+            bool_structure = randomize(num_vars)
+            # print_expr_tree(bool_structure)            
 
-        results[exp_name] = loss
 
-    [print(x, y) for x,y in results.items()]
+            X = pow([[0], [2]], 12)
+            random.shuffle(X)
+            
+            testtree = [insert_values_arr(bool_structure, x) for x in X]
+
+            prev = U
+            for t in testtree:
+                curr = eval_bool3(t)
+                if curr != prev:
+                    print(curr)
+                    print_expr_tree(t)
+                prev = curr
+
+
+            y = [eval_bool3(t) for t in testtree]
+            # print(y)
+            print("\n\n\n\n")
+            if len(set(y)) == 1:
+                continue
+            else:
+                valid_instances.append((bool_structure, X, y, testtree))
+            print("found!")
+        for inst_idx, (bool_structure, X, y, testtree) in enumerate(valid_instances):
+            nn = FeedForwardNN(12)
+            rows = pow([[0], [1], [2]], 12)
+
+            random.shuffle(rows)
+
+            X_tensor = torch.tensor(rows, dtype=torch.float32)
+            trees = [insert_values_arr(bool_structure, row) for row in rows]
+
+            y_tensor = torch.tensor([bool_to_int[eval_bool3(t)] for t in trees], dtype=torch.float32)
+            cross_val_train(nn, X_tensor, y_tensor, 5, 100)
+
+            exps = [causal_responsibility(t, 1.0) for t in trees]
+
+            losses_this_instance = {}
+            trial_count = len(X)
+            for exp_name, exp_func in explainers.items():
+                loss_sum = 0
+                for trial_idx in range(trial_count):
+                    input_tensor = torch.tensor([X[trial_idx]], dtype=torch.float32, requires_grad=True)
+                    target = int(bool_to_int[y[trial_idx]])
+                    
+                    explanation = exp_func(nn, input_tensor, target=target)
+                    if isinstance(explanation, torch.Tensor) and explanation.ndim == 2:
+                        explanation = explanation[0]
+                    
+                    loss_sum += js_divergence(explanation, exps[trial_idx])
+                avg_loss = loss_sum / trial_count
+                losses_this_instance[exp_name] = avg_loss
+            
+            for exp_name in explainers.keys():
+                instance_losses[exp_name].append(losses_this_instance[exp_name])
+            
+            row = [num_vars, inst_idx]
+            for exp_name in explainers.keys():
+
+                row.append(losses_this_instance[exp_name])
+            with open(output_filename, "a", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(row)
+            
+            instance_counter += 1
+        
+        avg_losses = {exp_name: np.mean(instance_losses[exp_name]) for exp_name in explainers.keys()}
+        print(f"Average losses for {num_vars} variables: {avg_losses}")
+
+        summary_row = [f"{num_vars}_avg", "all"]
+        for exp_name in explainers.keys():
+            summary_row.append(avg_losses[exp_name])
+        with open(output_filename, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(summary_row)
 
 if __name__ == "__main__":
     # main()
     # train_synth()
-    bool_test()
-    cause_test()
+    # bool_test()
+    rand_test()
     # bool_train()
     # print_expr_tree(n_and_or(10))

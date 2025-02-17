@@ -134,11 +134,9 @@ def eval_bool3(expr):
         op = expr.op
         if op == Bop.NOT:
             lhs_val = eval_bool3(expr.lhs)
-            if lhs_val == U:
-                return U
-            else:
-                return T if lhs_val == F else F
-
+            return invert(lhs_val)
+        
+        
         lhs = expr.lhs
         rhs = expr.rhs
 
@@ -183,7 +181,7 @@ def randomize(complexity):
         if complexity_left < 1:
             leaf_pool = deque(filter(lambda x: not isinstance(x, LEAF), leaf_pool))
 
-        ops = [Bop.AND, Bop.OR, Bop.XOR, Bop.NOT]
+        ops = [Bop.AND, Bop.OR]
         choice = random.choices(ops)[0]
 
         lhs = leaf_pool.popleft()
@@ -216,12 +214,22 @@ def insert_values(expr, vals):
 
     else:
         return expr
+    
+def insert_values(expr, vals):
+    if isinstance(expr, LEAF):
+        # Create a new LEAF with the same name and the new value
+        return LEAF(expr.name, vals[expr.name])
+    elif isinstance(expr, EX):
+        return EX(expr.op, 
+                  insert_values(expr.lhs, vals), 
+                  insert_values(expr.rhs, vals))
+    else:
+        return expr
 
 
 def insert_values_arr(expr, arr):
     vald = {str(i): arr[i] for i in range(len(arr))}
     return insert_values(expr, vald)
-
 
 
 if __name__ == "__main__":

@@ -40,21 +40,23 @@ def saliency(model, data, target):
 
     return explainer.attribute(data, target=target)
 
+
 def input_x_grad(model, data, target):
     explainer = InputXGradient(model.forward)
     explanation = explainer.attribute(data, target=target)
-    return torch.softmax(explanation, dim=1)
+    return explanation
 
 
 def integrated_grad(model, data, target):
     explainer = IntegratedGradients(model.forward)
     explanation = explainer.attribute(data, baselines=deeplift_baseline, target=target)
-    return torch.softmax(explanation, dim=1)
+    return explanation
 
 
 def lrp(model, data, target):
     explainer = LRP(model)
-    return torch.softmax (explainer.attribute(data, target=target), dim=1)
+    return explainer.attribute(data, target=target)
+
 
 def deeplift(model, data, target):
     explainer = DeepLift(model)
