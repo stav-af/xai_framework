@@ -1,3 +1,4 @@
+from functools import partial
 from pathlib import Path
 
 import csv
@@ -15,9 +16,11 @@ from models import cross_val_train, FeedForwardNN
 from explainers import kernel_shap, saliency, shapely_values, deeplift, lrp, deeplift, input_x_grad, integrated_grad, rexplain
 from responsibility import *
 from expression_bank import *
+from brute_resp_map import bf_resp
 import permutations
 import types
 import math
+import concurrent
 
 
 
@@ -80,6 +83,16 @@ explainers = {
     "IntegratedGrad": integrated_grad,
 }
 
+def dopar(func, items, n_workers=None):
+    results = []
+    with concurrent.futures.ProcessPoolExecutor(max_workers=n_workers) as executor:
+        results = list(executor.map(func, items))
+    return results
+
+def bf_resp_wrapper(row, bool_structure):
+    return bf_resp(bool_structure, row)
+
+
 def hack_forward(nn):
     """
         Gradient-based explainers implicitly use a 0 baseline. 
@@ -94,6 +107,8 @@ def hack_forward(nn):
     
     nn.forward = types.MethodType(new_forward, nn)
     return nn
+
+
 
 
 def get_relative_filepaths(directory):
@@ -266,31 +281,16 @@ def rand_test():
         valid_instances = []
         while len(valid_instances) < 10:
             bool_structure = randomize(num_vars)
-            # print_expr_tree(bool_structure)            
-
 
             X = pow([[0], [2]], 12)
             random.shuffle(X)
             
             testtree = [insert_values_arr(bool_structure, x) for x in X]
-
-            prev = U
-            for t in testtree:
-                curr = eval_bool3(t)
-                if curr != prev:
-                    print(curr)
-                    print_expr_tree(t)
-                prev = curr
-
-
             y = [eval_bool3(t) for t in testtree]
-            # print(y)
-            print("\n\n\n\n")
-            if len(set(y)) == 1:
-                continue
-            else:
+            
+            if len(set(y)) == 2:
                 valid_instances.append((bool_structure, X, y, testtree))
-            print("found!")
+            
         for inst_idx, (bool_structure, X, y, testtree) in enumerate(valid_instances):
             nn = FeedForwardNN(12)
             rows = pow([[0], [1], [2]], 12)
@@ -303,20 +303,27 @@ def rand_test():
             y_tensor = torch.tensor([bool_to_int[eval_bool3(t)] for t in trees], dtype=torch.float32)
             cross_val_train(nn, X_tensor, y_tensor, 5, 100)
 
-            exps = [causal_responsibility(t, 1.0) for t in trees]
-
+            # expx 
             losses_this_instance = {}
-            trial_count = len(X)
+            trial_count = 10
+            
+
+            print("begin bf")
+            # exps = [bf_resp(bool_structure, row) for row in X[:trial_count]]
+            partial_bf_resp = partial(bf_resp_wrapper, bool_structure=bool_structure)
+            exps = dopar(partial_bf_resp, X[:trial_count])            
+            print("end bf")
+
+            print(f"Explaining")
+            print_expr_tree(bool_structure)
             for exp_name, exp_func in explainers.items():
+                print(f"Running {exp_name}")
                 loss_sum = 0
                 for trial_idx in range(trial_count):
                     input_tensor = torch.tensor([X[trial_idx]], dtype=torch.float32, requires_grad=True)
                     target = int(bool_to_int[y[trial_idx]])
                     
-                    explanation = exp_func(nn, input_tensor, target=target)
-                    if isinstance(explanation, torch.Tensor) and explanation.ndim == 2:
-                        explanation = explanation[0]
-                    
+                    explanation = exp_func(nn, input_tensor, target=target).cpu().tolist()[0]
                     loss_sum += js_divergence(explanation, exps[trial_idx])
                 avg_loss = loss_sum / trial_count
                 losses_this_instance[exp_name] = avg_loss
