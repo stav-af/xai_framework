@@ -266,7 +266,8 @@ def cause_test():
 
 
 def rand_test():
-    output_filename = "rand_test_results.csv"
+    output_filename = "rand_test_results_gpu.csv"
+
     
     header = ["num_vars", "instance", *list(explainers.keys())]
     with open(output_filename, "w", newline="") as f:
@@ -301,11 +302,11 @@ def rand_test():
             trees = [insert_values_arr(bool_structure, row) for row in rows]
 
             y_tensor = torch.tensor([bool_to_int[eval_bool3(t)] for t in trees], dtype=torch.float32)
-            cross_val_train(nn, X_tensor, y_tensor, 5, 100)
+            cross_val_train(nn, X_tensor, y_tensor, 5, 300)
 
             # expx 
             losses_this_instance = {}
-            trial_count = 10
+            trial_count = 200
             
 
             print("begin bf")
