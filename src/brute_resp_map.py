@@ -7,7 +7,7 @@ from tqdm import tqdm
 import sys
 import random
 
-from responsibility import eval_bool3, randomize, insert_values_arr, print_expr_tree
+from responsibility import eval_bool3, randomize, insert_values_arr, print_expr_tree, LEAF, EX, Bop
 
 """CONSTANTS"""
 N_PARTITIONS = 12
@@ -109,17 +109,31 @@ def responsibility(part: List, consistent_set: List[List]) -> float:
     return 1.0 / (1.0 + float(minpart))
 
 
+def used_idxs(expr):
+    if isinstance(expr, LEAF):
+        return set([int(expr.name)])
+    
+    if expr.op == Bop.NOT:
+        return used_idxs(expr.lhs)
+    
+    return used_idxs(expr.lhs).union(used_idxs(expr.rhs))
+
+
+def used_unused_partitioning(expr):
+    used = used_idxs(expr)
+    return [[i] for i in list(used)]
+
+
 def bf_resp(expr, feature_values):
     eval = wrap_eval(expr)
     initial_result = eval(feature_values)
     print(initial_result)
     
-    feature_importance = [0 for _ in range(len(feature_values))]
-    partitions = [[n] for n in range(len(feature_values))]
-
-    mutants = []
+    feature_importance = [0.0 for _ in range(len(feature_values))]
+    partitions_n = used_unused_partitioning(expr)
     
-    for combo in partitions_combinations(partitions):
+    mutants = []
+    for combo in partitions_combinations(partitions_n):
         occluded_data = occlude(feature_values, combo)
         mut = Mutant(partitions=combo, data=occluded_data)
         mutants.append(mut)
@@ -129,11 +143,10 @@ def bf_resp(expr, feature_values):
         mutants
     ))
 
-    for part in tqdm(partitions):
+    for part in tqdm(partitions_n):
         resp = responsibility(part, cst_set)
         feature_importance = apply_responsibility(feature_importance, part, resp)
         
-
     return feature_importance
 
 
@@ -144,5 +157,5 @@ if __name__ == "__main__":
     print_expr_tree(rand)
     print("\n\n\n")
 
-    result = bf_resp(rand, [2.0 for _ in range(12)])
+    result = bf_resp(rand, [0.0 for _ in range(12)])
     print(result)

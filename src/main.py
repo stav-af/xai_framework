@@ -306,7 +306,7 @@ def rand_test():
 
             # expx 
             losses_this_instance = {}
-            trial_count = 200
+            trial_count = 1000
             
 
             print("begin bf")
