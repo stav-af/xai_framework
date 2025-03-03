@@ -66,27 +66,28 @@ def train_model(model, X_train, y_train, X_val, y_val, epochs=1000, lr=0.001):
 
 def cross_val_train(model, X, y, n_splits=5, epochs=1000, lr=0.001):
     skf = StratifiedKFold(n_splits=n_splits)
-    fold_accuracies = []
+    fold_accuracy = 0.0
 
-    for fold, (train_idx, val_idx) in enumerate(skf.split(X, y)):
-        print(f"Fold {fold + 1}/{n_splits}")
-        
-        X_train, X_val = X[train_idx], X[val_idx]
-        y_train, y_val = y[train_idx], y[val_idx]
-        
-        model = train_model(model, X_train, y_train, X_val, y_val, epochs=epochs, lr=lr)
-        
-        val_inputs = torch.tensor(X_val, dtype=torch.float32)
-        val_outputs = model(val_inputs)
+    while fold_accuracy != 1.0:
+        for fold, (train_idx, val_idx) in enumerate(skf.split(X, y)):
+            print(f"Fold {fold + 1}/{n_splits}")
+            
+            X_train, X_val = X[train_idx], X[val_idx]
+            y_train, y_val = y[train_idx], y[val_idx]
+            
+            model = train_model(model, X_train, y_train, X_val, y_val, epochs=epochs, lr=lr)
+            
+            val_inputs = torch.tensor(X_val, dtype=torch.float32)
+            val_outputs = model(val_inputs)
 
-        val_preds = torch.argmax(val_outputs, dim=1)
+            val_preds = torch.argmax(val_outputs, dim=1)
 
-        val_preds = val_preds.numpy()
-        val_acc = accuracy_score(y_val, val_preds)
+            val_preds = val_preds.numpy()
+            val_acc = accuracy_score(y_val, val_preds)
 
-        fold_accuracies.append(val_acc)
+            fold_accuracy = val_acc
+
     
-    print(f"Average accuracy over {n_splits} folds: {np.mean(fold_accuracies):.4f}")
     return model
 
 

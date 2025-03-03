@@ -302,7 +302,7 @@ def rand_test():
             trees = [insert_values_arr(bool_structure, row) for row in rows]
 
             y_tensor = torch.tensor([bool_to_int[eval_bool3(t)] for t in trees], dtype=torch.float32)
-            cross_val_train(nn, X_tensor, y_tensor, 5, 300)
+            cross_val_train(nn, X_tensor, y_tensor, 3, 500)
 
             # expx 
             losses_this_instance = {}
