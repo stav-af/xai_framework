@@ -161,7 +161,7 @@ def exp_mse(truth, result):
     return se / 12
 
 
-def js_divergence(p, q):
+def ljs_divergence(p, q):
     p = np.array(p, dtype=float)
     q = np.array(q, dtype=float)
     
@@ -183,6 +183,52 @@ def js_divergence(p, q):
         print(f"nan on iuts \n{p}\n{q} ")
         exit(0)
     return abs(js_div)
+
+
+import numpy as np
+import math
+
+def js_divergence(p, q):
+    p = np.array(p, dtype=float)
+    q = np.array(q, dtype=float)
+
+    p = np.nan_to_num(p, nan=0.0, posinf=0.0, neginf=0.0)
+    q = np.nan_to_num(q, nan=0.0, posinf=0.0, neginf=0.0)
+
+    p = np.maximum(p, 0)
+    q = np.maximum(q, 0)
+
+    sum_p = np.sum(p)
+    sum_q = np.sum(q)
+
+    if sum_p == 0 and sum_q == 0:
+        return 0.0
+
+    if sum_p == 0:
+        p = np.zeros_like(p)
+        p[0] = 1.0
+    if sum_q == 0:
+        q = np.zeros_like(q)
+        q[0] = 1.0
+
+    p = p / np.sum(p)
+    q = q / np.sum(q)
+
+    m = 0.5 * (p + q)
+
+    def kl_divergence(a, b):
+        mask = (a > 0) & (b > 0)
+        return np.sum(a[mask] * np.log(a[mask] / b[mask]))
+
+    js_div = 0.5 * kl_divergence(p, m) + 0.5 * kl_divergence(q, m)
+    if np.isnan(js_div) or math.isinf(js_div):
+        return 0.0
+
+    return js_div
+
+
+
+
 
 
 def bool_test():
@@ -266,7 +312,7 @@ def cause_test():
 
 
 def rand_test():
-    output_filename = "rand_test_results_gpu.csv"
+    output_filename = "rand_last_test_results_cpu.csv"
 
     
     header = ["num_vars", "instance", *list(explainers.keys())]
@@ -274,7 +320,7 @@ def rand_test():
         writer = csv.writer(f)
         writer.writerow(header)
     
-    for num_vars in range(3, 10):
+    for num_vars in range(10, 11):
         print(f"Processing formulas with {num_vars} variables...")
         instance_losses = {exp_name: [] for exp_name in explainers.keys()}
         instance_counter = 0
