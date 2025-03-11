@@ -1,6 +1,7 @@
 from enum import Enum, auto
 from collections import defaultdict, deque
 
+import sys
 import random
 
 from permutations import pow
@@ -174,32 +175,29 @@ def randomize(complexity):
     # Create a pool of LEAF nodes with unique names
     leaves = [LEAF(str(i)) for i in range(FEATURE_COUNT)] * 3
     random.shuffle(leaves)
-    leaf_pool = deque(leaves)
+    leaf_pool = random.choices(leaves, k=complexity)
 
-    complexity_left = complexity
+
+    lin_ops = [Bop.AND, Bop.OR]
+    non_ops = [Bop.AND, Bop.OR, Bop.NOT, Bop.XOR]
+    
+    ops = lin_ops if sys.argv[2] == "t" else non_ops
+
     while len(leaf_pool) > 1:
-        if complexity_left < 1:
-            leaf_pool = deque(filter(lambda x: not isinstance(x, LEAF), leaf_pool))
+        random.shuffle(leaf_pool)
+        lhs = leaf_pool.pop()
+        choice = random.choice(ops)
 
-        ops = [Bop.AND, Bop.OR]
-        choice = random.choices(ops)[0]
-
-        lhs = leaf_pool.popleft()
         if(choice == Bop.NOT):
             expr = EX(choice, lhs, None)
-            if isinstance(lhs, LEAF): complexity_left -= 1
         else:
-            rhs = leaf_pool.popleft()
-            
-            if isinstance(lhs, LEAF): complexity_left -= 1
-            if isinstance(rhs, LEAF): complexity_left -= 1
-            
+            rhs = leaf_pool.pop()
             expr = EX(choice, lhs, rhs)
 
         leaf_pool.append(expr)
 
     # Return the root of the randomly constructed formula
-    return leaf_pool.popleft()
+    return leaf_pool.pop()
 
 
 def insert_values(expr, vals):
