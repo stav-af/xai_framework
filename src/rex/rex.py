@@ -27,27 +27,30 @@ def wrap_forward(nn):
         return pred.item()
     return forward
 
+
 def cdf(arr):
     result = []
-    cum = 0.0
+    acc = 0.0
     for x in arr:
-        cum += x
-        result.append(cum)
+        acc += x
+        result.append(acc)
     return result
+
 
 def norm(arr):
     s = sum(arr)
     if s == 0.0:
-        n = len(arr)
-        return [1.0 / n for _ in range(n)]
+        return [1.0 / len(arr) for _ in arr]
     else:
         return [x / s for x in arr]
+
 
 def find_index(f, lst):
     for i, x in enumerate(lst):
         if f(x):
             return i
-    return None
+
+    raise LookupError(f"Couldn't find any element satisfying f in {lst}")
 
 
 def powerset(iterable):
@@ -61,15 +64,19 @@ def partitions_combinations(partitions):
         powerset(partitions)))
 
 
-def occlude(data, partitions):
+def occlude(data, partitions, neutral_values=None):
+    if neutral_values is None:
+        neutral_values = [NEUTRAL_VALUE for _ in data]
+
     acc = []
     for (idx, elem) in enumerate(data):
         if all((not idx in partition) for partition in partitions):
             acc.append(elem)
         else:
-            acc.append(NEUTRAL_VALUE)
+            acc.append(neutral_values[idx])
 
     return acc
+
 
 def partition(responsibility, choices, n_parts):
     if all(x == 0.0 for x in responsibility):
@@ -92,8 +99,6 @@ def partition(responsibility, choices, n_parts):
 
         rand = random.random()
         curr_choice = find_index(lambda x: x > rand, steps)
-        if curr_choice is None:
-            raise RuntimeError("Shouldn't really be here")
 
         curr_resp = resp_options[curr_choice]
         next_partition = curr + [curr_choice]
